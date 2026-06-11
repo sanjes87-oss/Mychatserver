@@ -5,35 +5,36 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io and allow all cross-origin requests for mobile/desktop apps
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// When a user connects to the server
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Listen for a message from a client
+  // Expecting structured profile details from the Flutter app
   socket.on('send_message', (data) => {
-    console.log(`Message received: ${data.text} from ${data.sender}`);
+    const payload = {
+      text: data.text,
+      senderId: data.senderId,
+      firstName: data.firstName || 'Anonymous',
+      lastName: data.lastName || '',
+      gender: data.gender || 'Not specified',
+      timestamp: new Date().toISOString()
+    };
     
-    // Broadcast the message to EVERYONE connected
-    io.emit('receive_message', data);
+    console.log(`Message from ${payload.firstName}: ${payload.text}`);
+    
+    // Distribute the message and profile to everyone online
+    io.emit('receive_message', payload);
   });
 
-  // When a user closes the app
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
   });
 });
 
-// Dynamic port allocation for Render, defaulting to 3000 for local testing
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Chat server running on port ${PORT}`);
 });
