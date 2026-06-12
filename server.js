@@ -4,37 +4,40 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  console.log(`Connected: ${socket.id}`);
 
-  // Expecting structured profile details from the Flutter app
-  socket.on('send_message', (data) => {
-    const payload = {
-      text: data.text,
-      senderId: data.senderId,
-      firstName: data.firstName || 'Anonymous',
-      lastName: data.lastName || '',
-      gender: data.gender || 'Not specified',
+  // Handle joining specific group channels
+  socket.on('join_group', (groupName) => {
+    socket.join(groupName);
+    console.log(`User ${socket.id} joined group: ${groupName}`);
+  });
+
+  // Listen for text/file messages sent to a specific group
+  socket.on('send_group_message', (data) => {
+    // data contains: groupName, text, fileUrl, senderName
+    io.to(data.groupName).emit('receive_group_message', {
+      sender: data.senderName,
+      text: data.text || '',
+      fileUrl: data.fileUrl || null,
       timestamp: new Date().toISOString()
-    };
-    
-    console.log(`Message from ${payload.firstName}: ${payload.text}`);
-    
-    // Distribute the message and profile to everyone online
-    io.emit('receive_message', payload);
+    });
+  });
+
+  // Track automated user status updates (Online / Away)
+  socket.on('update_status', (data) => {
+    io.emit('user_status_changed', {
+      userId: socket.id,
+      status: data.status // 'Online' or 'Away'
+    });
   });
 
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
+    console.log(`Disconnected: ${socket.id}`);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Chat server running on port ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`Active on port ${PORT}`));
